@@ -7,8 +7,11 @@ build:
 test:
     ./gradlew test
 
+fmt:
+    ./gradlew spotlessApply
+
 style:
-    just editorconfig
+    ./gradlew spotlessCheck detekt && just editorconfig
 
 editorconfig:
     editorconfig-checker -config .ecrc
