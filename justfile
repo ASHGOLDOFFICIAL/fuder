@@ -12,6 +12,3 @@ style:
 
 editorconfig:
     editorconfig-checker -config .ecrc
-
-run:
-    ./gradlew :app:run
