@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Nested
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+private val recipeCreated = EventType("RecipeCreated")
+
 private class RenameField(
     override val eventType: EventType,
     override val fromVersion: EventVersion,
@@ -20,31 +22,23 @@ private class RenameField(
 
 class UpcasterChainTest {
 
-    private val recipeCreated = EventType("RecipeCreated")
-
     @Nested
     inner class `given a payload two versions behind` {
+        private val chain =
+            UpcasterChain(
+                listOf(
+                    RenameField(recipeCreated, EventVersion(1), EventVersion(2), from = "name", to = "title"),
+                    RenameField(recipeCreated, EventVersion(2), EventVersion(3), from = "title", to = "displayName"),
+                ),
+            )
 
         @Nested
         inner class `when upcasting` {
+            private val result = chain.upcast(recipeCreated, EventVersion(1), mapOf("name" to "Pancakes"))
 
             @Test
             fun `then every step in the chain applies in order`() {
-                val chain =
-                    UpcasterChain(
-                        listOf(
-                            RenameField(recipeCreated, EventVersion(1), EventVersion(2), from = "name", to = "title"),
-                            RenameField(
-                                recipeCreated,
-                                EventVersion(2),
-                                EventVersion(3),
-                                from = "title",
-                                to = "displayName",
-                            ),
-                        ),
-                    )
-
-                val (version, payload) = chain.upcast(recipeCreated, EventVersion(1), mapOf("name" to "Pancakes"))
+                val (version, payload) = result
 
                 assertEquals(EventVersion(3), version)
                 assertEquals(mapOf("displayName" to "Pancakes"), payload)
@@ -54,18 +48,18 @@ class UpcasterChainTest {
 
     @Nested
     inner class `given a payload already at the current version` {
+        private val chain =
+            UpcasterChain(
+                listOf(RenameField(recipeCreated, EventVersion(1), EventVersion(2), from = "name", to = "title")),
+            )
 
         @Nested
         inner class `when upcasting` {
+            private val result = chain.upcast(recipeCreated, EventVersion(2), mapOf("title" to "Pancakes"))
 
             @Test
             fun `then it passes through unchanged`() {
-                val chain =
-                    UpcasterChain(
-                        listOf(RenameField(recipeCreated, EventVersion(1), EventVersion(2), from = "name", to = "title")),
-                    )
-
-                val (version, payload) = chain.upcast(recipeCreated, EventVersion(2), mapOf("title" to "Pancakes"))
+                val (version, payload) = result
 
                 assertEquals(EventVersion(2), version)
                 assertEquals(mapOf("title" to "Pancakes"), payload)
@@ -75,20 +69,18 @@ class UpcasterChainTest {
 
     @Nested
     inner class `given upcasters for a different event type` {
+        private val chain =
+            UpcasterChain(
+                listOf(RenameField(EventType("ToolCreated"), EventVersion(1), EventVersion(2), from = "name", to = "title")),
+            )
 
         @Nested
         inner class `when upcasting` {
+            private val result = chain.upcast(recipeCreated, EventVersion(1), mapOf("name" to "Whisk"))
 
             @Test
             fun `then they are ignored`() {
-                val chain =
-                    UpcasterChain(
-                        listOf(
-                            RenameField(EventType("ToolCreated"), EventVersion(1), EventVersion(2), from = "name", to = "title"),
-                        ),
-                    )
-
-                val (version, payload) = chain.upcast(recipeCreated, EventVersion(1), mapOf("name" to "Whisk"))
+                val (version, payload) = result
 
                 assertEquals(EventVersion(1), version)
                 assertEquals(mapOf("name" to "Whisk"), payload)
