@@ -7,6 +7,7 @@ plugins {
 
 detekt {
     buildUponDefaultConfig = true
+    config.setFrom(rootProject.layout.projectDirectory.file("config/detekt/detekt.yml"))
 }
 
 spotless {
