@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Nested
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+private val streamId = StreamId("counter-1")
+
 private sealed interface CounterEvent {
     data class Incremented(
         val amount: Int,
@@ -72,58 +74,51 @@ private class RecordingEventStore<E>(
     }
 }
 
+private fun repository(
+    eventStore: EventStore<CounterEvent> = InMemoryEventStore(),
+    snapshotStore: SnapshotStore<Int> = InMemorySnapshotStore(),
+    schemaVersion: SchemaVersion = SchemaVersion(1),
+    snapshotFrequency: Int = 100,
+) = EventSourcedRepository(CounterDecider, eventStore, snapshotStore, schemaVersion, snapshotFrequency)
+
 class EventSourcedRepositoryTest {
-
-    private val streamId = StreamId("counter-1")
-
-    private fun repository(
-        eventStore: EventStore<CounterEvent> = InMemoryEventStore(),
-        snapshotStore: SnapshotStore<Int> = InMemorySnapshotStore(),
-        schemaVersion: SchemaVersion = SchemaVersion(1),
-        snapshotFrequency: Int = 100,
-    ) = EventSourcedRepository(CounterDecider, eventStore, snapshotStore, schemaVersion, snapshotFrequency)
 
     @Nested
     inner class `given several events across multiple commands` {
+        private val repo = repository()
+
+        init {
+            repo.handle(streamId, CounterCommand.Increment(5))
+            repo.handle(streamId, CounterCommand.Decrement(2))
+            repo.handle(streamId, CounterCommand.Increment(10))
+        }
 
         @Nested
         inner class `when loading` {
+            private val loaded = repo.load(streamId)
 
             @Test
             fun `then state reflects all of them in order`() {
-                val repo = repository()
-
-                repo.handle(streamId, CounterCommand.Increment(5))
-                repo.handle(streamId, CounterCommand.Decrement(2))
-                repo.handle(streamId, CounterCommand.Increment(10))
-
-                val loaded = repo.load(streamId)
-
                 assertEquals(13, loaded.state)
-                assertEquals(
-                    StreamVersion.INITIAL
-                        .next()
-                        .next()
-                        .next(),
-                    loaded.version,
-                )
+                assertEquals(StreamVersion.INITIAL.next().next().next(), loaded.version)
             }
         }
     }
 
     @Nested
     inner class `given a command the decider rejects` {
+        private val repo = repository()
+
+        init {
+            repo.handle(streamId, CounterCommand.Increment(1))
+        }
 
         @Nested
         inner class `when handling it` {
+            private val result = repo.handle(streamId, CounterCommand.Decrement(5))
 
             @Test
             fun `then nothing is appended`() {
-                val repo = repository()
-                repo.handle(streamId, CounterCommand.Increment(1))
-
-                val result = repo.handle(streamId, CounterCommand.Decrement(5))
-
                 assertEquals(HandleError.Rejected(WouldGoNegative), result.leftOrNull())
                 assertEquals(1, repo.load(streamId).state)
             }
@@ -132,21 +127,21 @@ class EventSourcedRepositoryTest {
 
     @Nested
     inner class `given events crossing the snapshot frequency` {
+        private val eventStore = RecordingEventStore(InMemoryEventStore<CounterEvent>())
+        private val repo = repository(eventStore = eventStore, snapshotFrequency = 2)
+
+        init {
+            repo.handle(streamId, CounterCommand.Increment(1))
+            repo.handle(streamId, CounterCommand.Increment(1))
+            eventStore.readCalls.clear()
+        }
 
         @Nested
         inner class `when loading again` {
+            private val loaded = repo.load(streamId)
 
             @Test
             fun `then only events after the snapshot are read`() {
-                val eventStore = RecordingEventStore(InMemoryEventStore<CounterEvent>())
-                val repo = repository(eventStore = eventStore, snapshotFrequency = 2)
-
-                repo.handle(streamId, CounterCommand.Increment(1))
-                repo.handle(streamId, CounterCommand.Increment(1))
-                eventStore.readCalls.clear()
-
-                val loaded = repo.load(streamId)
-
                 assertEquals(2, loaded.state)
                 assertEquals(listOf(StreamVersion.INITIAL.next().next()), eventStore.readCalls)
             }
@@ -155,21 +150,22 @@ class EventSourcedRepositoryTest {
 
     @Nested
     inner class `given a snapshot from a different schema version` {
+        private val eventStore = RecordingEventStore(InMemoryEventStore<CounterEvent>())
+        private val snapshotStore = InMemorySnapshotStore<Int>()
+        private val repoV2 = repository(eventStore, snapshotStore, schemaVersion = SchemaVersion(2), snapshotFrequency = 1)
+
+        init {
+            repository(eventStore, snapshotStore, schemaVersion = SchemaVersion(1), snapshotFrequency = 1)
+                .handle(streamId, CounterCommand.Increment(5))
+            eventStore.readCalls.clear()
+        }
 
         @Nested
         inner class `when loading` {
+            private val loaded = repoV2.load(streamId)
 
             @Test
             fun `then the stream is replayed from the start`() {
-                val eventStore = RecordingEventStore(InMemoryEventStore<CounterEvent>())
-                val snapshotStore = InMemorySnapshotStore<Int>()
-                repository(eventStore, snapshotStore, schemaVersion = SchemaVersion(1), snapshotFrequency = 1)
-                    .handle(streamId, CounterCommand.Increment(5))
-                val repoV2 = repository(eventStore, snapshotStore, schemaVersion = SchemaVersion(2), snapshotFrequency = 1)
-                eventStore.readCalls.clear()
-
-                val loaded = repoV2.load(streamId)
-
                 assertEquals(5, loaded.state)
                 assertEquals(listOf(StreamVersion.INITIAL), eventStore.readCalls)
             }
