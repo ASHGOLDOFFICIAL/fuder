@@ -17,5 +17,6 @@ plugins {
 }
 
 include(":app")
+include(":eventsourcing-core")
 
 rootProject.name = "fuder"

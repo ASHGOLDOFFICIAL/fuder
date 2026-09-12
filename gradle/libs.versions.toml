@@ -2,8 +2,10 @@
 kotlin = "2.4.0"
 spotless = "8.10.2"
 detekt = "1.23.8"
+arrow = "2.1.2"
 
 [libraries]
 kotlinGradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 spotlessGradlePlugin = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
 detektGradlePlugin = { module = "io.gitlab.arturbosch.detekt:detekt-gradle-plugin", version.ref = "detekt" }
+arrowCore = { module = "io.arrow-kt:arrow-core", version.ref = "arrow" }
