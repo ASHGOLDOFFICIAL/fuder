@@ -16,7 +16,7 @@
       in {
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
-            temurin-bin-25
+            temurin-bin-21
             just
             editorconfig-checker
           ];
