@@ -16,6 +16,7 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
+include(":commons:repository")
 include(":eventsourcing-core")
 include(":kuirlibro:app")
 include(":kuirlibro:domain")
