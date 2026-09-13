@@ -2,8 +2,11 @@ package org.aulune.kuirlibro.domain.ingredient
 
 import org.aulune.kuirlibro.domain.ImageRef
 import org.aulune.kuirlibro.domain.MeasurementKind
+import org.aulune.kuirlibro.domain.NutritionFacts
+import org.aulune.kuirlibro.domain.NutritionValue
 import org.aulune.kuirlibro.domain.ObjectKey
 import org.junit.jupiter.api.Nested
+import java.math.BigDecimal
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -11,8 +14,14 @@ private val id = IngredientId("123e4567-e89b-12d3-a456-426614174000").getOrNull(
 private val name = IngredientName("Flour").getOrNull()!!
 private val otherName = IngredientName("Whole Wheat Flour").getOrNull()!!
 private val image = ImageRef(ObjectKey("ingredients/flour.jpg").getOrNull()!!)
+private val nutrition = NutritionFacts(
+    calories = NutritionValue(BigDecimal("364")).getOrNull()!!,
+    protein = NutritionValue(BigDecimal("10.3")).getOrNull()!!,
+    fat = NutritionValue(BigDecimal("1")).getOrNull()!!,
+    carbs = NutritionValue(BigDecimal("76.3")).getOrNull()!!,
+)
 
-private fun created(): Ingredient = IngredientDecider.evolve(null, IngredientEvent.IngredientCreated(id, name, MeasurementKind.MASS))!!
+private fun created(): Ingredient = IngredientDecider.evolve(null, IngredientEvent.IngredientCreated(id, name, MeasurementKind.MASS, nutrition))!!
 
 class IngredientDeciderTest {
 
@@ -22,12 +31,15 @@ class IngredientDeciderTest {
 
         @Nested
         inner class `when creating it` {
-            private val result = IngredientDecider.decide(state, IngredientCommand.CreateIngredient(id, name, MeasurementKind.MASS))
+            private val result = IngredientDecider.decide(
+                state,
+                IngredientCommand.CreateIngredient(id, name, MeasurementKind.MASS, nutrition),
+            )
 
             @Test
             fun `then IngredientCreated is produced`() {
                 assertEquals(
-                    listOf(IngredientEvent.IngredientCreated(id, name, MeasurementKind.MASS)),
+                    listOf(IngredientEvent.IngredientCreated(id, name, MeasurementKind.MASS, nutrition)),
                     result.getOrNull(),
                 )
             }
@@ -50,8 +62,10 @@ class IngredientDeciderTest {
 
         @Nested
         inner class `when creating it again` {
-            private val result =
-                IngredientDecider.decide(state, IngredientCommand.CreateIngredient(id, name, MeasurementKind.MASS))
+            private val result = IngredientDecider.decide(
+                state,
+                IngredientCommand.CreateIngredient(id, name, MeasurementKind.MASS, nutrition),
+            )
 
             @Test
             fun `then it fails with AlreadyExists`() {
@@ -66,6 +80,16 @@ class IngredientDeciderTest {
             @Test
             fun `then IngredientRenamed is produced`() {
                 assertEquals(listOf(IngredientEvent.IngredientRenamed(otherName)), result.getOrNull())
+            }
+        }
+
+        @Nested
+        inner class `when changing its nutrition` {
+            private val result = IngredientDecider.decide(state, IngredientCommand.SetIngredientNutrition(NutritionFacts.ZERO))
+
+            @Test
+            fun `then IngredientNutritionSet is produced`() {
+                assertEquals(listOf(IngredientEvent.IngredientNutritionSet(NutritionFacts.ZERO)), result.getOrNull())
             }
         }
 
