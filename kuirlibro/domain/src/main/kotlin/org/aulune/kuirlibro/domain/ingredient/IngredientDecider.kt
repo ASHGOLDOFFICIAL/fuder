@@ -20,12 +20,24 @@ object IngredientDecider : Decider<Ingredient?, IngredientCommand, IngredientEve
         when (command) {
             is IngredientCommand.CreateIngredient -> {
                 ensure(state == null) { IngredientError.AlreadyExists }
-                listOf(IngredientEvent.IngredientCreated(command.id, command.name, command.measurementKind))
+                listOf(
+                    IngredientEvent.IngredientCreated(
+                        command.id,
+                        command.name,
+                        command.measurementKind,
+                        command.nutritionPerUnit,
+                    ),
+                )
             }
 
             is IngredientCommand.RenameIngredient -> {
                 ensureActive(state)
                 listOf(IngredientEvent.IngredientRenamed(command.name))
+            }
+
+            is IngredientCommand.SetIngredientNutrition -> {
+                ensureActive(state)
+                listOf(IngredientEvent.IngredientNutritionSet(command.nutritionPerUnit))
             }
 
             is IngredientCommand.SetIngredientImage -> {
@@ -46,10 +58,18 @@ object IngredientDecider : Decider<Ingredient?, IngredientCommand, IngredientEve
     }
 
     override fun evolve(state: Ingredient?, event: IngredientEvent): Ingredient? = when (event) {
-        is IngredientEvent.IngredientCreated ->
-            Ingredient(event.id, event.name, event.measurementKind, image = null, status = IngredientStatus.ACTIVE)
+        is IngredientEvent.IngredientCreated -> Ingredient(
+            event.id,
+            event.name,
+            event.measurementKind,
+            event.nutritionPerUnit,
+            image = null,
+            status = IngredientStatus.ACTIVE,
+        )
 
         is IngredientEvent.IngredientRenamed -> state?.copy(name = event.name)
+
+        is IngredientEvent.IngredientNutritionSet -> state?.copy(nutritionPerUnit = event.nutritionPerUnit)
 
         is IngredientEvent.IngredientImageSet -> state?.copy(image = event.image)
 
