@@ -4,7 +4,7 @@ plugins {
 }
 
 dependencies {
-    api(project(":eventsourcing-core"))
+    api(project(":commons:repository"))
     api(libs.arrowCore)
     testImplementation(kotlin("test"))
 }
