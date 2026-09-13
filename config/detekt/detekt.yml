@@ -32,6 +32,8 @@ complexity:
     active: true
   StringLiteralDuplication:
     active: true
+  TooManyFunctions:
+    active: false
 
 coroutines:
   GlobalCoroutineUsage:
